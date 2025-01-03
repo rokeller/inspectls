@@ -1,0 +1,63 @@
+name: Release
+
+on:
+  release:
+    types: [published]
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        os: ['linux','windows']
+        arch: ['386','amd64','arm','arm64']
+        exclude:
+          - os: windows
+            arch: 'arm'
+          - os: windows
+            arch: 'arm64'
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v5
+      with:
+        go-version-file: 'go.mod'
+
+    - name: Build
+      run: |
+        case "${{ matrix.os }}" in
+            windows)
+                EXT='.exe' ;;
+            *)
+                EXT='' ;;
+        esac
+
+        ARCHIVE_BASE_NAME="inspectls-${{ matrix.os }}-${{ matrix.arch }}"
+        GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build \
+            -o .out/inspectls$EXT \
+            -ldflags "-s -w \
+                -X github.com/rokeller/inspectls/v2/cmd.version=${{ github.event.release.name }}"
+
+        case "${{ matrix.os }}" in
+            windows)
+                zip -j .out/$ARCHIVE_BASE_NAME.zip .out/inspectls$EXT
+                echo "ARCHIVE_PATH=.out/$ARCHIVE_BASE_NAME.zip" >> $GITHUB_ENV
+                echo "ARCHIVE_MEDIA_TYPE=application/zip" >> $GITHUB_ENV
+                ;;
+            *)
+                tar -cvzf .out/$ARCHIVE_BASE_NAME.tar.gz -C .out inspectls$EXT
+                echo "ARCHIVE_PATH=.out/$ARCHIVE_BASE_NAME.tar.gz" >> $GITHUB_ENV
+                echo "ARCHIVE_MEDIA_TYPE=application/gzip" >> $GITHUB_ENV
+                ;;
+        esac
+
+    - name: Upload to release
+      uses: JasonEtco/upload-to-release@master
+      with:
+        args: ${{ env.ARCHIVE_PATH }} ${{ env.ARCHIVE_MEDIA_TYPE }}
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+        # TODO: test
