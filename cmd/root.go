@@ -16,17 +16,23 @@ import (
 
 var version string
 
+const (
+	FlagServerName    = "server-name"
+	FlagMinTlsVersion = "min-tls"
+	FlagMaxTlsVersion = "max-tls"
+)
+
 var rootCmd = &cobra.Command{
 	Use:   "inspectls",
 	Short: "inspectls inspects TLS endpoints' certificates",
 	Long:  "inspectls helps inspecting certificates available on TLS endpoints",
-	Args:  cobra.MinimumNArgs(1),
+	Args:  cobra.ExactArgs(1),
 
 	Version: version,
 
 	RunE: func(cmd *cobra.Command, args []string) error {
 		for _, arg := range args {
-			if err := inspect(arg); err != nil {
+			if err := inspect(cmd, arg); err != nil {
 				return err
 			}
 		}
@@ -49,10 +55,25 @@ func init() {
 	klog.InitFlags(fs)
 
 	rootCmd.Flags().AddGoFlagSet(fs)
+
+	rootCmd.Flags().StringP(FlagServerName, "s", "",
+		"The name to pass to the server when SNI is used. If unset the argument "+
+			"FQDN is used unless it is an IP address.")
+
+	var (
+		minTlsVersion, maxTlsVersion tlsVersion
+	)
+	rootCmd.Flags().VarP(&minTlsVersion, FlagMinTlsVersion, "m",
+		`The minimum TLS version to use. Must be one of "ssl3.0", "tls1.0", "tls1.1", "tls1.2", "tls1.3".`)
+	rootCmd.Flags().VarP(&maxTlsVersion, FlagMaxTlsVersion, "x",
+		`The maximum TLS version to use. Must be one of "ssl3.0", "tls1.0", "tls1.1", "tls1.2", "tls1.3".`)
 }
 
 type inspectContext struct {
-	address string
+	address       string
+	serverName    string
+	minTlsVersion *uint16
+	maxTlsVersion *uint16
 }
 
 func (c inspectContext) verifyCert(
@@ -84,8 +105,16 @@ func (c inspectContext) verifyCert(
 		fmt.Printf("  IP Addresses   : %v\n", cert.IPAddresses)
 		fmt.Printf("  Not Before     : %v\n", cert.NotBefore)
 		fmt.Printf("  Not After      : %v\n", cert.NotAfter)
-
 	}
+
+	return nil
+}
+
+func (c inspectContext) verifyConn(connState tls.ConnectionState) error {
+	fmt.Println("Connection details:")
+	fmt.Printf("  Version        : %s\n", tls.VersionName(connState.Version))
+	fmt.Printf("  Cipher Suite   : %s\n", tls.CipherSuiteName(connState.CipherSuite))
+	fmt.Printf("  Server Name    : %s\n", connState.ServerName)
 
 	return nil
 }
@@ -94,15 +123,37 @@ func (c inspectContext) getTLSConfig() *tls.Config {
 	config := tls.Config{
 		InsecureSkipVerify:    true,
 		VerifyPeerCertificate: c.verifyCert,
+		VerifyConnection:      c.verifyConn,
+		ServerName:            c.serverName,
+	}
+
+	if c.minTlsVersion != nil {
+		config.MinVersion = *c.minTlsVersion
+	}
+	if c.maxTlsVersion != nil {
+		config.MaxVersion = *c.maxTlsVersion
 	}
 
 	return &config
 }
 
-func inspect(address string) error {
+func inspect(cmd *cobra.Command, address string) error {
+	serverName := cmd.Flag(FlagServerName).Value.String()
+
 	c := inspectContext{
-		address: address,
+		address:    address,
+		serverName: serverName,
 	}
+
+	minTlsVersion := cmd.Flag(FlagMinTlsVersion).Value.(*tlsVersion)
+	if minTlsVersion != nil {
+		c.minTlsVersion = minTlsVersion.getTlsVersion()
+	}
+	maxTlsVersion := cmd.Flag(FlagMaxTlsVersion).Value.(*tlsVersion)
+	if maxTlsVersion != nil {
+		c.maxTlsVersion = maxTlsVersion.getTlsVersion()
+	}
+
 	conn, err := tls.Dial("tcp", address, c.getTLSConfig())
 	if err != nil {
 		klog.Errorf("failed to dial %q: %v", address, err)
