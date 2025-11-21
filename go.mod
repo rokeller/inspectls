@@ -3,8 +3,8 @@ module github.com/rokeller/inspectls/v2
 go 1.23.4
 
 require (
-	github.com/spf13/cobra v1.9.1
-	github.com/spf13/pflag v1.0.7
+	github.com/spf13/cobra v1.10.1
+	github.com/spf13/pflag v1.0.9
 	k8s.io/klog/v2 v2.130.1
 )
 
