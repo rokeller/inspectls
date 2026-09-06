@@ -3,12 +3,12 @@ module github.com/rokeller/inspectls/v2
 go 1.23.4
 
 require (
-	github.com/spf13/cobra v1.9.1
-	github.com/spf13/pflag v1.0.6
-	k8s.io/klog/v2 v2.130.1
+	github.com/spf13/cobra v1.10.2
+	github.com/spf13/pflag v1.0.10
+	k8s.io/klog/v2 v2.140.0
 )
 
 require (
-	github.com/go-logr/logr v1.4.2 // indirect
+	github.com/go-logr/logr v1.4.4 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 )
