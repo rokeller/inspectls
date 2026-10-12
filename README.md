@@ -3,11 +3,17 @@
 ## Usage
 
 ```bash
-./inspectTls dns.of.host:port
+./inspectls dns.of.host:port
 ```
 
 So for instance
 
 ```bash
-./inspectTls github.com:443
+./inspectls github.com:443
+```
+
+To learn more about how to use `inspectls`, call
+
+```bash
+./inspectls --help
 ```

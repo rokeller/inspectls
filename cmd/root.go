@@ -17,7 +17,7 @@ import (
 	"k8s.io/klog/v2"
 )
 
-var version string
+var version string = "local-development"
 
 const (
 	FlagServerName     = "server-name"
